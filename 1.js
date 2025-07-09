@@ -5,7 +5,7 @@ const TILT_THRESHOLD = 0;
 const EXTREME_TILT_THRESHOLD = 25;
 const MOVEMENT_SPEED = 1;
 const VERTICAL_SPEED = 0.1;
-const NEUTRAL_ANGLE = 0;
+const NEUTRAL_ANGLE = 3;
 
 AFRAME.registerComponent('flight-button', {
   init: function() {
