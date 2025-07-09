@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title></title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="1.js"></script>
+    <script src="2.js"></script>
+    <script src="3.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <script src="teclado.js"></script>
+</head>
+
+<body>
+    <!-- Escena -->
+
+    <a-scene google-search>
+        <!-- Ambiente -->
+        <!--         <a-sky color="#f8f9fa"></a-sky>
+        <a-plane position="0 0 0" rotation="-90 0 0" width="20" height="20" color="#e8eaed"></a-plane> -->
+
+        <!-- edificio -->
+        <a-entity position="-32 -2.9 -58" scale="1 1 1" gltf-model="1.glb" shadow="cast: true; receive: false">
+        </a-entity>
+        <a-entity position="-32 -2.9 -58" scale="1 1 1" gltf-model="2.glb" shadow="cast: true; receive: false">
+        </a-entity>
+        <a-entity position="0.2 1 -9.1" scale="1 1 1" gltf-model="man1.glb" shadow="cast: true; receive: false">
+        </a-entity>
+        <a-entity position="0.2 1 -9.1" scale="1 1 1" gltf-model="man2.glb" shadow="cast: true; receive: false">
+        </a-entity>
+
+        <!-- camara -->
+        <a-entity id="rig" position="0 1.6 0" flight-controls>
+            <a-camera look-controls>
+                <a-cursor color="#ff1e00" fuse="true" fuseTimeout="1500"></a-cursor>
+                <!-- linterna -->
+                <a-entity id="flashlight" light="type: spot; 
+        color: #fff; 
+        intensity: 0; 
+        angle: 90; 
+        penumbra: 0.2; 
+        decay: 1;
+        distance: 25;
+        castShadow: true;
+        shadowMapWidth: 1024;
+        shadowMapHeight: 1024" position="0 0 0" rotation="0 0 0">
+                </a-entity>
+            </a-camera>
+            <a-entity camera look-controls wasd-controls position="0 1.6 0">
+                <a-entity cursor="fuse: true; fuseTimeout: 500" position="0 0 -1"
+                    geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+                    material="color: black; shader: flat">
+                    <a-animation begin="fusing" easing="ease-in" attribute="scale" dur="500" fill="forwards"
+                        from="1 1 1" to="0.1 0.1 0.1"></a-animation>
+                    <a-animation begin="click" easing="ease-in" attribute="scale" dur="150" fill="forwards"
+                        from="0.1 0.1 0.1" to="1 1 1"></a-animation>
+                </a-entity>
+            </a-entity>
+        </a-entity>
+
+        <!-- Cámara y controles -->
+
+
+        <!-- Enhanced Lighting with new colors -->
+
+        <a-light type="spot" color="#ffdb9d" intensity="1" position="0 4.4 0" angle="180" penumbra="0.1" distance="25"
+            decay="1" cast-shadow="true" shadow="mapSize: 1024; bias: -0.0001; camera-near: 0.01; camera-far: 0.2">
+            <a-sphere radius="0.1" color="#ffdb9d" material="emissive: #fff6dd; emissiveIntensity: 1.5"></a-sphere>
+        </a-light>
+        <a-light type="spot" color="#ffdb9d" intensity="1" rotation="0 180 0" position="0 4.4 0" angle="180"
+            penumbra="0.1" distance="25" decay="1" cast-shadow="true"
+            shadow="mapSize: 1024; bias: -0.0001; camera-near: 0.01; camera-far: 0.2">
+            <a-sphere radius="0.1" color="#ffdb9d" material="emissive: #fff6dd; emissiveIntensity: 1.5"></a-sphere>
+        </a-light>
+        <a-light type="spot" color="#0080ff" intensity="0.5" rotation="0 90 0" position="0 1.7 -8" angle="180"
+            penumbra="0.1" distance="25" decay="1" cast-shadow="true"
+            shadow="mapSize: 1024; bias: -0.0001; camera-near: 0.01; camera-far: 0.2">
+            <!-- <a-sphere radius="0.1" color="#ffdb9d" material="emissive: #0080ff; emissiveIntensity: 0.5"></a-sphere> -->
+        </a-light>
+
+        <!-- Add flight mode button -->
+        <a-entity position="0 3 -8">
+            <a-cylinder id="flight-button" radius="0.15" height="0.1"
+                material="color: #ff4400; metalness: 0.8; roughness: 0.2" flight-button
+                animation__hover="property: position; dir: alternate; dur: 1000; easing: easeInOutSine; loop: true; to: 0 0.1 0"
+                look-at-camera>
+                <a-text value="SUIT MODE" align="center" position="0 0.4 0.06" scale="0.5 0.5 0.5" color="#FFD700"
+                    side="double">
+                </a-text>
+                <a-ring position="0 0.06 0" radius-inner="0.16" radius-outer="0.18"
+                    material="color: #FFD700; metalness: 0.8; roughness: 0.2"
+                    animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear">
+                </a-ring>
+            </a-cylinder>
+        </a-entity>
+
+        <!-- Enhanced Screen Displays -->
+        <!-- 1 -->
+        <a-entity position="-8 3 -6" rotation="0 90 0" look-at-camera>
+            <a-plane width="2" height="4" material="color: #0563f0; opacity: 0.2; metalness: 1; roughness: 0.2">
+                <a-entity position="0 0.7 0.01"
+                    text="value: Screen 1\nStandby; color: cyan; align: center; width: 2"></a-entity>
+                <a-box width="2" height="0.1" depth="0.05" position="0 2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+                <a-box width="2" height="0.1" depth="0.05" position="0 -2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+            </a-plane>
+        </a-entity>
+        <!-- 2 -->
+        <a-entity position="-8 3 -3" rotation="0 90 0" look-at-camera>
+            <a-plane width="2" height="4" material="color: #0563f0; opacity: 0.2; metalness: 1; roughness: 0.2">
+                <a-entity position="0 0.7 0.01"
+                    text="value: Screen 2\nStandby; color: cyan; align: center; width: 2"></a-entity>
+                <a-box width="2" height="0.1" depth="0.05" position="0 2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+                <a-box width="2" height="0.1" depth="0.05" position="0 -2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+            </a-plane>
+        </a-entity>
+        <!-- 3 -->
+        <a-entity position="-8 3 0" rotation="0 90 0" look-at-camera>
+            <a-plane width="2" height="4" material="color: #0563f0; opacity: 0.2; metalness: 1; roughness: 0.2">
+                <a-entity position="0 0.7 0.01"
+                    text="value: Screen 3\nStandby; color: cyan; align: center; width: 2"></a-entity>
+                <a-box width="2" height="0.1" depth="0.05" position="0 2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+                <a-box width="2" height="0.1" depth="0.05" position="0 -2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+            </a-plane>
+        </a-entity>
+
+        <!-- 4 -->
+        <a-entity position="-8 3 3" rotation="0 90 0" look-at-camera>
+            <a-plane width="2" height="4" material="color: #0563f0; opacity: 0.2; metalness: 1; roughness: 0.2">
+                <a-entity position="0 0.7 0.01"
+                    text="value: Screen 4\nStandby; color: cyan; align: center; width: 2"></a-entity>
+                <a-box width="2" height="0.1" depth="0.05" position="0 2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+                <a-box width="2" height="0.1" depth="0.05" position="0 -2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+            </a-plane>
+        </a-entity>
+
+        <!-- 5 -->
+        <a-entity position="-8 3 6" rotation="0 90 0" look-at-camera>
+            <a-plane width="2" height="4" material="color: #0563f0; opacity: 0.2; metalness: 1; roughness: 0.2">
+                <a-entity position="0 0.7 0.01"
+                    text="value: Screen 5\nStandby; color: cyan; align: center; width: 2"></a-entity>
+                <a-box width="2" height="0.1" depth="0.05" position="0 2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+                <a-box width="2" height="0.1" depth="0.05" position="0 -2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+            </a-plane>
+        </a-entity>
+
+
+        <!-- 6 -->
+        <a-entity position="8 3 -6" rotation="0 -90 0" look-at-camera>
+            <a-plane width="2" height="4" material="color: #0563f0; opacity: 0.2; metalness: 1; roughness: 0.2">
+                <a-entity position="0 0.7 0.01"
+                    text="value: Screen 6\nStandby; color: cyan; align: center; width: 2"></a-entity>
+                <a-box width="2" height="0.1" depth="0.05" position="0 2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+                <a-box width="2" height="0.1" depth="0.05" position="0 -2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+            </a-plane>
+        </a-entity>
+        <!-- 7 -->
+        <a-entity position="8 3 -3" rotation="0 -90 0" look-at-camera>
+            <a-plane width="2" height="4" material="color: #0563f0; opacity: 0.2; metalness: 1; roughness: 0.2"
+                weather-display>
+                <a-entity position="0 0.7 0.01"
+                    text="value: Screen75\nStandby; color: cyan; align: center; width: 2"></a-entity>
+                <a-box width="2" height="0.1" depth="0.05" position="0 2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+                <a-box width="2" height="0.1" depth="0.05" position="0 -2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+            </a-plane>
+        </a-entity>
+
+        <!-- 8 -->
+        <a-entity position="8 3 0" rotation="0 -90 0" look-at-camera>
+            <a-plane width="2" height="4" material="color: #0563f0; opacity: 0.2; metalness: 1; roughness: 0.2">
+                <a-entity position="0 0.7 0.01"
+                    text="value: Screen 8\nStandby; color: cyan; align: center; width: 2"></a-entity>
+                <a-box width="2" height="0.1" depth="0.05" position="0 2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+                <a-box width="2" height="0.1" depth="0.05" position="0 -2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+            </a-plane>
+        </a-entity>
+
+        <!-- 9 -->
+        <a-entity position="8 3 3" rotation="0 -90 0" look-at-camera>
+            <a-plane width="2" height="4" material="color: #0563f0; opacity: 0.2; metalness: 1; roughness: 0.2">
+                <a-entity position="0 0.7 0.01"
+                    text="value: Screen 9\nStandby; color: cyan; align: center; width: 2"></a-entity>
+                <a-box width="2" height="0.1" depth="0.05" position="0 2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+                <a-box width="2" height="0.1" depth="0.05" position="0 -2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+            </a-plane>
+        </a-entity>
+
+        <!-- 10 -->
+        <a-entity position="8 3 6" rotation="0 -90 0" look-at-camera>
+            <a-plane width="2" height="4" material="color: #0563f0; opacity: 0.2; metalness: 1; roughness: 0.2">
+                <a-entity position="0 0.7 0.01"
+                    text="value: Screen 10\nStandby; color: cyan; align: center; width: 2"></a-entity>
+                <a-box width="2" height="0.1" depth="0.05" position="0 2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+                <a-box width="2" height="0.1" depth="0.05" position="0 -2 0"
+                    material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
+            </a-plane>
+        </a-entity>
+
+    </a-scene>
+</body>
+
+</html>
