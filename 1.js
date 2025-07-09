@@ -1,11 +1,11 @@
 // === FLIGHT HUD SCRIPT ACTUALIZADO === //
 // Versión mejorada visual con proporciones y blur en extremos como el HUD de Iron Man
 
-const TILT_THRESHOLD = 0;
+const TILT_THRESHOLD = 45;
 const EXTREME_TILT_THRESHOLD = 20;
 const MOVEMENT_SPEED = 1;
 const VERTICAL_SPEED = 0.05;
-const NEUTRAL_ANGLE = -45;
+const NEUTRAL_ANGLE = 0;
 
 AFRAME.registerComponent('flight-button', {
   init: function() {
