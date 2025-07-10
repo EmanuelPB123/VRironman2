@@ -1,30 +1,289 @@
 <!DOCTYPE html>
 <html>
-
-<head>
-    <meta charset="utf-8">
-    <title></title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
+  <head>
+    <title>A-Frame Scene</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="1.js"></script>
-    <script src="2.js"></script>
+    <style>
+      .touch-controls {
+        position: fixed;
+        bottom: 50px;
+        z-index: 999;
+        touch-action: none;
+        width: 180px;
+        height: 180px;
+      }
+      
+      #movement-pad {
+        left: 20px;
+      }
+      
+      #elevation-pad {
+        right: 20px;
+        width: 60px;
+      }
+      
+      .touch-button {
+        width: 50px;
+        height: 50px;
+        background-color: rgba(255, 255, 255, 0.3);
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        border-radius: 50%;
+        position: absolute;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 20px;
+        font-weight: bold;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      
+      /* Hide on desktop */
+      @media (min-width: 1024px) {
+        .touch-controls {
+          display: none;
+        }
+      }
+    </style>
+    <script>
+      AFRAME.registerComponent('proximity-sensor', {
+        init: function() {
+          this.camera = document.querySelector('#camera');
+          this.textElement = document.querySelector('#proximity-text');
+          this.sphere = document.querySelector('#target-sphere');
+          this.isInRange = false;
+          this.moveSpeed = 0.1;
+          this.controlsEnabled = false;
+          this.wasInRange = false;
+
+          // Add new properties for smooth camera movement
+          this.cameraVelocity = 0;
+          this.acceleration = 0.01;
+          this.maxVelocity = 0.1;
+          this.friction = 0.95;
+          this.keys = {
+            q: false,
+            e: false
+          };
+
+          // Add touch control state
+          this.touchControls = {
+            up: false,
+            down: false
+          };
+
+          // Modify touch controls setup
+          this.wasdControls = {
+            w: false,
+            a: false,
+            s: false,
+            d: false
+          };
+
+          // Setup touch controls
+          this.setupTouchControls();
+
+          // Modify key listeners for continuous movement
+          document.addEventListener('keydown', (event) => {
+            if (!this.controlsEnabled) return;
+            const key = event.key.toLowerCase();
+            if (key === 'q' || key === 'e') {
+              this.keys[key] = true;
+            }
+          });
+
+          document.addEventListener('keyup', (event) => {
+            const key = event.key.toLowerCase();
+            if (key === 'q' || key === 'e') {
+              this.keys[key] = false;
+            }
+          });
+
+          this.hudText = document.querySelector('#hud-text');
+        },
+
+        setupTouchControls: function() {
+          // WASD controls
+          const wasdButtons = ['w', 'a', 's', 'd'];
+          wasdButtons.forEach(key => {
+            const btn = document.getElementById(`${key}-btn`);
+            
+            btn.addEventListener('touchstart', (e) => {
+              e.preventDefault();
+              this.wasdControls[key] = true;
+              // Create fake keydown event
+              const keyEvent = new KeyboardEvent('keydown', {
+                key: key,
+                code: 'Key' + key.toUpperCase(),
+                keyCode: key.charCodeAt(0),
+                which: key.charCodeAt(0),
+                bubbles: true
+              });
+              window.dispatchEvent(keyEvent);
+            });
+
+            btn.addEventListener('touchend', (e) => {
+              e.preventDefault();
+              this.wasdControls[key] = false;
+              // Create fake keyup event
+              const keyEvent = new KeyboardEvent('keyup', {
+                key: key,
+                code: 'Key' + key.toUpperCase(),
+                keyCode: key.charCodeAt(0),
+                which: key.charCodeAt(0),
+                bubbles: true
+              });
+              window.dispatchEvent(keyEvent);
+            });
+          });
+
+          // Elevation controls (Q/E equivalent)
+          const upBtn = document.getElementById('up-btn');
+          const downBtn = document.getElementById('down-btn');
+
+          const touchStart = (btn, control) => {
+            btn.addEventListener('touchstart', (e) => {
+              e.preventDefault();
+              if (this.controlsEnabled) {
+                this.touchControls[control] = true;
+              }
+              btn.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
+            });
+          };
+
+          const touchEnd = (btn, control) => {
+            btn.addEventListener('touchend', (e) => {
+              e.preventDefault();
+              this.touchControls[control] = false;
+              btn.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+            });
+
+            // Add touchcancel handling
+            btn.addEventListener('touchcancel', (e) => {
+              e.preventDefault();
+              this.touchControls[control] = false;
+              btn.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+            });
+          };
+
+          touchStart(upBtn, 'up');
+          touchEnd(upBtn, 'up');
+          touchStart(downBtn, 'down');
+          touchEnd(downBtn, 'down');
+        },
+
+        tick: function() {
+          const distance = this.camera.object3D.position.distanceTo(this.sphere.object3D.position);
+          const inRange = distance < 4;
+
+          // Update HUD with height and distance info
+          const cameraRig = this.camera.parentElement;
+          const height = Math.round(cameraRig.getAttribute('position').y * 10) / 10;
+          const distanceRounded = Math.round(distance * 10) / 10;
+          
+          // Check if we're on mobile/tablet
+          const isMobile = window.innerWidth < 1024;
+          const controlsText = isMobile ? 
+            `Controles:\nPad izquierdo: WASD para moverte\nPad derecho: Q/E para subir/bajar` :
+            `Controles: Q/E: Subir/Bajar`;
+          
+          this.hudText.setAttribute('value', 
+            `Altura: ${height}m\n` +
+            `Distancia a esfera: ${distanceRounded}m\n` +
+            controlsText);
+
+          // Add smooth camera movement logic
+          if (this.controlsEnabled) {
+            if (this.keys.q || this.touchControls.up) {
+              this.cameraVelocity = Math.min(this.cameraVelocity + this.acceleration, this.maxVelocity);
+            } else if (this.keys.e || this.touchControls.down) {
+              this.cameraVelocity = Math.max(this.cameraVelocity - this.acceleration, -this.maxVelocity);
+            } else {
+              this.cameraVelocity *= this.friction;
+            }
+
+            // Apply velocity to camera position
+            if (Math.abs(this.cameraVelocity) > 0.0001) {
+              const cameraRig = this.camera.parentElement;
+              const currentY = cameraRig.getAttribute('position').y;
+              const newY = Math.max(0.5, currentY + this.cameraVelocity); // Minimum height of 0.5
+              cameraRig.setAttribute('position', {
+                x: cameraRig.getAttribute('position').x,
+                y: newY,
+                z: cameraRig.getAttribute('position').z
+              });
+            }
+          }
+
+          // Toggle controls when entering range
+          if (inRange && !this.wasInRange) {
+            this.controlsEnabled = !this.controlsEnabled;
+            // Reset velocity when toggling controls
+            this.cameraVelocity = 0;
+          }
+          
+          if (inRange) {
+            const distanceText = Math.round(distance * 10) / 10;
+            const controlStatus = this.controlsEnabled ? "ACTIVADOS" : "DESACTIVADOS";
+            this.textElement.setAttribute('value', 
+              `¡Estás cerca! Distancia: ${distanceText} metros\n` +
+              `Controles Q/E ${controlStatus}`);
+            this.textElement.setAttribute('visible', true);
+          } else {
+            this.textElement.setAttribute('visible', false);
+          }
+
+          this.wasInRange = inRange;
+        }
+      });
+    </script>
+          <script src="2.js"></script>
     <script src="3.js"></script>
-    <link rel="stylesheet" href="styles.css">
-    <script src="teclado.js"></script>
-</head>
+  </head>
+  <body>
+    <!-- Touch Controls -->
+    <div id="movement-pad" class="touch-controls">
+      <div id="w-btn" class="touch-button" style="top: 0; left: 65px;">W</div>
+      <div id="s-btn" class="touch-button" style="bottom: 0; left: 65px;">S</div>
+      <div id="a-btn" class="touch-button" style="left: 0; top: 65px;">A</div>
+      <div id="d-btn" class="touch-button" style="right: 0; top: 65px;">D</div>
+    </div>
+    
+    <div id="elevation-pad" class="touch-controls">
+      <div id="up-btn" class="touch-button" style="top: 0;">Q</div>
+      <div id="down-btn" class="touch-button" style="bottom: 0;">E</div>
+    </div>
 
-<body>
-    <!-- Escena -->
+    <a-scene>
+      <!-- Ambiente -->
+      <a-sky color="#000000"></a-sky>
+      <a-plane position="0 0 -4" rotation="-90 0 0" width="4" height="4" color="#7BC8A4"></a-plane>
+      
+      <!-- Camera rig with proximity sensor -->
+      <a-entity position="0 1.6 0">
+        <a-camera id="camera" proximity-sensor>
+          <a-text id="proximity-text"
+                  value=""
+                  position="0 0.1 -1"
+                  scale="0.5 0.5 0.5"
+                  align="center"
+                  color="#000000"
+                  visible="false"></a-text>
+          
+          <a-entity id="hud" position="0 -0.2 -1">
+            <a-plane width="0.8" height="0.2" color="#333" opacity="0.5" position="0 0 0"></a-plane>
+            <a-text id="hud-text"
+                    value="Cargando..."
+                    position="0 0 0.01"
+                    scale="0.2 0.2 0.2"
+                    align="center"
+                    color="#FFF"></a-text>
+          </a-entity>
+        </a-camera>
+      </a-entity>
 
-    <a-scene google-search>
-        <!-- Ambiente -->
-        <!--         <a-sky color="#f8f9fa"></a-sky>
-        <a-plane position="0 0 0" rotation="-90 0 0" width="20" height="20" color="#e8eaed"></a-plane> -->
-
-        <!-- edificio -->
+                <!-- edificio -->
         <a-entity position="-32 -2.9 -58" scale="1 1 1" gltf-model="1.glb" shadow="cast: true; receive: false">
         </a-entity>
         <a-entity position="-32 -2.9 -58" scale="1 1 1" gltf-model="2.glb" shadow="cast: true; receive: false">
@@ -33,73 +292,17 @@
         </a-entity>
         <a-entity position="0.2 1 -9.1" scale="1 1 1" gltf-model="man2.glb" shadow="cast: true; receive: false">
         </a-entity>
+      
+      <!-- Objetos -->
+      <a-box position="-1 0.5 -3" rotation="0 45 0" color="#4CC3D9"></a-box>
+      <a-sphere id="target-sphere" position="0 1.25 0" radius="1.25" color="#EF2D5E"></a-sphere>
+      <a-cylinder position="1 0.75 -3" radius="0.5" height="1.5" color="#FFC65D"></a-cylinder>
+      
+      <!-- Iluminación -->
+      <a-light type="ambient" color="#445451"></a-light>
+      <a-light type="point" intensity="2" position="2 4 4"></a-light>
 
-        <!-- camara -->
-        <a-entity id="rig" position="0 1.6 0" flight-controls>
-            <a-camera look-controls>
-                <a-cursor color="#ff1e00" fuse="true" fuseTimeout="1500"></a-cursor>
-                <!-- linterna -->
-                <a-entity id="flashlight" light="type: spot; 
-        color: #fff; 
-        intensity: 0; 
-        angle: 90; 
-        penumbra: 0.2; 
-        decay: 1;
-        distance: 25;
-        castShadow: true;
-        shadowMapWidth: 1024;
-        shadowMapHeight: 1024" position="0 0 0" rotation="0 0 0">
-                </a-entity>
-            </a-camera>
-            <a-entity camera look-controls wasd-controls position="0 1.6 0">
-                <a-entity cursor="fuse: true; fuseTimeout: 500" position="0 0 -1"
-                    geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
-                    material="color: black; shader: flat">
-                    <a-animation begin="fusing" easing="ease-in" attribute="scale" dur="500" fill="forwards"
-                        from="1 1 1" to="0.1 0.1 0.1"></a-animation>
-                    <a-animation begin="click" easing="ease-in" attribute="scale" dur="150" fill="forwards"
-                        from="0.1 0.1 0.1" to="1 1 1"></a-animation>
-                </a-entity>
-            </a-entity>
-        </a-entity>
-
-        <!-- Cámara y controles -->
-
-
-        <!-- Enhanced Lighting with new colors -->
-
-        <a-light type="spot" color="#ffdb9d" intensity="1" position="0 4.4 0" angle="180" penumbra="0.1" distance="25"
-            decay="1" cast-shadow="true" shadow="mapSize: 1024; bias: -0.0001; camera-near: 0.01; camera-far: 0.2">
-            <a-sphere radius="0.1" color="#ffdb9d" material="emissive: #fff6dd; emissiveIntensity: 1.5"></a-sphere>
-        </a-light>
-        <a-light type="spot" color="#ffdb9d" intensity="1" rotation="0 180 0" position="0 4.4 0" angle="180"
-            penumbra="0.1" distance="25" decay="1" cast-shadow="true"
-            shadow="mapSize: 1024; bias: -0.0001; camera-near: 0.01; camera-far: 0.2">
-            <a-sphere radius="0.1" color="#ffdb9d" material="emissive: #fff6dd; emissiveIntensity: 1.5"></a-sphere>
-        </a-light>
-        <a-light type="spot" color="#0080ff" intensity="0.5" rotation="0 90 0" position="0 1.7 -8" angle="180"
-            penumbra="0.1" distance="25" decay="1" cast-shadow="true"
-            shadow="mapSize: 1024; bias: -0.0001; camera-near: 0.01; camera-far: 0.2">
-            <!-- <a-sphere radius="0.1" color="#ffdb9d" material="emissive: #0080ff; emissiveIntensity: 0.5"></a-sphere> -->
-        </a-light>
-
-        <!-- Add flight mode button -->
-        <a-entity position="0 2.5 -8">
-            <a-cylinder id="flight-button" radius="0.15" height="0.1"
-                material="color: #ff4400; metalness: 0.8; roughness: 0.2" flight-button
-                animation__hover="property: position; dir: alternate; dur: 1000; easing: easeInOutSine; loop: true; to: 0 0.1 0"
-                look-at-camera>
-                <a-text value="SUIT MODE" align="center" position="0 0.4 0.06" scale="0.5 0.5 0.5" color="#FFD700"
-                    side="double">
-                </a-text>
-                <a-ring position="0 0.06 0" radius-inner="0.16" radius-outer="0.18"
-                    material="color: #FFD700; metalness: 0.8; roughness: 0.2"
-                    animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear">
-                </a-ring>
-            </a-cylinder>
-        </a-entity>
-
-        <!-- Enhanced Screen Displays -->
+       <!-- Enhanced Screen Displays -->
         <!-- 1 -->
         <a-entity position="-8 3 -6" rotation="0 90 0" look-at-camera>
             <a-plane width="2" height="4" material="color: #0563f0; opacity: 0.2; metalness: 1; roughness: 0.2">
@@ -218,8 +421,7 @@
                     material="color: #858585; metalness: 0.8; roughness: 0.2"></a-box>
             </a-plane>
         </a-entity>
-
+      
     </a-scene>
-</body>
-
+  </body>
 </html>
