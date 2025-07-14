@@ -5,6 +5,13 @@
     <title>A-Frame Scene</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            /* Set a default background color */
+        }
+
         .touch-controls {
             position: fixed;
             bottom: 50px;
@@ -90,17 +97,28 @@
                 this.targetAcceleration = 50;
                 this.accelerationRate = 10;
 
-                // Initialize camera with WASD controls acceleration
-                setTimeout(() => {
-                    this.camera.setAttribute('wasd-controls', 'acceleration: 50');
-                }, 100);
+                // Add velocity calculation properties
+                this.lastPosition = new THREE.Vector3();
+                this.currentVelocity = 0;
+                this.lastUpdateTime = performance.now();
+                this.velocityBuffer = []; // Add buffer for smoothing
+                this.bufferSize = 5; // Number of samples to average
 
-                // Modify key listeners for continuous movement
+                // Add separate velocity tracking for horizontal and vertical movement
+                this.horizontalVelocityBuffer = [];
+                this.verticalVelocityBuffer = [];
+                this.lastHeight = 0;
+
+                // Add key listeners for WASD controls
                 document.addEventListener('keydown', (event) => {
-                    if (!this.controlsEnabled) return;
                     const key = event.key.toLowerCase();
+                    if (!this.controlsEnabled) return;
                     if (key === 'q' || key === 'e') {
                         this.keys[key] = true;
+                    }
+                    // Track WASD keys
+                    if (this.wasdControls.hasOwnProperty(key)) {
+                        this.wasdControls[key] = true;
                     }
                 });
 
@@ -108,6 +126,16 @@
                     const key = event.key.toLowerCase();
                     if (key === 'q' || key === 'e') {
                         this.keys[key] = false;
+                    }
+                    // Track WASD keys and reset acceleration when all are released
+                    if (this.wasdControls.hasOwnProperty(key)) {
+                        this.wasdControls[key] = false;
+                        // Check if all WASD keys are released
+                        if (!Object.values(this.wasdControls).some(value => value)) {
+                            this.targetAcceleration = 50;
+                            this.currentAcceleration = 50;
+                            this.camera.setAttribute('wasd-controls', 'acceleration: 50');
+                        }
                     }
                 });
 
@@ -185,15 +213,66 @@
             },
 
             tick: function () {
-                const distance = this.camera.object3D.position.distanceTo(this.sphere.object3D.position);
+                // Get the camera rig's world position
                 const cameraRig = this.camera.parentElement;
+                const currentPosition = new THREE.Vector3();
+                cameraRig.object3D.getWorldPosition(currentPosition);
+
+                const currentTime = performance.now();
+                const deltaTime = (currentTime - this.lastUpdateTime) / 1000; // Convert to seconds
+
+                // Calculate distance to suit
+                const distanceToSuit = this.camera.object3D.position.distanceTo(this.sphere.object3D.position);
+
+                if (deltaTime > 0) {  // Prevent division by zero
+                    // Calculate horizontal velocity using distance to suit
+                    const horizontalDistance = Math.abs(distanceToSuit - this.lastDistance);
+
+                    // Calculate vertical distance moved
+                    const verticalDistance = Math.abs(currentPosition.y - this.lastPosition.y);
+
+                    // Calculate instantaneous velocities
+                    const instantHorizontalVelocity = horizontalDistance / deltaTime;
+                    const instantVerticalVelocity = verticalDistance / deltaTime;
+
+                    // Add to buffers
+                    this.horizontalVelocityBuffer.push(instantHorizontalVelocity);
+                    this.verticalVelocityBuffer.push(instantVerticalVelocity);
+
+                    // Keep buffer size limited
+                    if (this.horizontalVelocityBuffer.length > this.bufferSize) {
+                        this.horizontalVelocityBuffer.shift();
+                    }
+                    if (this.verticalVelocityBuffer.length > this.bufferSize) {
+                        this.verticalVelocityBuffer.shift();
+                    }
+
+                    // Calculate average velocities using the last 3 values for smoother results
+                    const recentHorizontalValues = this.horizontalVelocityBuffer.slice(-3);
+                    const recentVerticalValues = this.verticalVelocityBuffer.slice(-3);
+
+                    const horizontalVelocity = recentHorizontalValues.reduce((a, b) => a + b, 0) / recentHorizontalValues.length;
+                    const verticalVelocity = recentVerticalValues.reduce((a, b) => a + b, 0) / recentVerticalValues.length;
+
+                    // Calculate total velocity
+                    this.currentVelocity = Math.sqrt(Math.pow(horizontalVelocity, 2) + Math.pow(verticalVelocity, 2));
+                }
+
+                // Store last distance for next frame
+                this.lastDistance = distanceToSuit;
+
+                // Update last position and time for next frame
+                this.lastPosition.copy(currentPosition);
+                this.lastUpdateTime = currentTime;
+
+                const distance = this.camera.object3D.position.distanceTo(this.sphere.object3D.position);
                 const heightDiff = Math.abs(cameraRig.getAttribute('position').y - this.sphere.object3D.position.y);
 
                 // Check both horizontal distance AND height difference
                 const inRange = distance < 4 && heightDiff < 3;
 
                 // Time-based acceleration logic
-                if (this.controlsEnabled) {
+                if (this.controlsEnabled && Object.values(this.wasdControls).some(value => value)) {
                     const now = Date.now();
                     if (this.activationTime === 0) {
                         this.activationTime = now;
@@ -209,7 +288,7 @@
                     } else if (timeActive <= 20) {
                         this.targetAcceleration = 500;
                     } else {
-                        this.targetAcceleration = 1500;
+                        this.targetAcceleration = 1900;
                     }
                 } else {
                     this.targetAcceleration = 50;
@@ -227,19 +306,26 @@
                 // Update WASD controls acceleration
                 this.camera.setAttribute('wasd-controls', `acceleration: ${this.currentAcceleration}`);
 
-                // Update HUD with height and distance info
+                // Update HUD with height, distance, and velocity info
                 const height = Math.round(cameraRig.getAttribute('position').y * 10) / 10;
                 const distanceRounded = Math.round(distance * 10) / 10;
+                const controlStatus = this.controlsEnabled ? "ACTIVADOS" : "DESACTIVADOS";
+                const horizontalVel = Math.round(this.horizontalVelocityBuffer[this.horizontalVelocityBuffer.length - 1] * 10) / 10 || 0;
+                const verticalVel = Math.round(this.verticalVelocityBuffer[this.verticalVelocityBuffer.length - 1] * 10) / 10 || 0;
+                const totalVel = Math.round(this.currentVelocity * 10) / 10;
 
                 // Check if we're on mobile/tablet
                 const isMobile = window.innerWidth < 1024;
                 const controlsText = isMobile ?
-                    `Controles:\nPad izquierdo: WASD para moverte\nPad derecho: Q/E para subir/bajar` :
-                    `Controles: WASD: Moverte | Q/E: Subir/Bajar`;
+                    `Controles:\nPad izquierdo: WASD para moverte\nPad derecho: Q/E para subir/bajar\nQ/E están: ${controlStatus}` :
+                    `Controles: WASD: Moverte | Q/E: Subir/Bajar | Q/E están: ${controlStatus}`;
 
                 this.hudText.setAttribute('value',
                     `Altura: ${height}m\n` +
                     `Distancia a traje: ${distanceRounded}m\n` +
+                    `Velocidad H: ${horizontalVel}m/s (${Math.round((horizontalVel * 3.6) * 10) / 10}km/h)\n` +
+                    `Velocidad V: ${verticalVel}m/s (${Math.round((verticalVel * 3.6) * 10) / 10}km/h)\n` +
+                    `Velocidad Total: ${totalVel}m/s (${Math.round((totalVel * 3.6) * 10) / 10}km/h)\n` +
                     controlsText);
 
                 // Add smooth camera movement logic
@@ -277,7 +363,7 @@
                     const controlStatus = this.controlsEnabled ? "ACTIVADOS" : "DESACTIVADOS";
                     this.textElement.setAttribute('value',
                         `¡Estás cerca! Distancia: ${distanceText} metros\n` +
-                        `Controles Q/E ${controlStatus}`);
+                        `Controles Q/E: ${controlStatus}`);
                     this.textElement.setAttribute('visible', true);
                 } else {
                     this.textElement.setAttribute('visible', false);
@@ -305,7 +391,7 @@
 
     <a-scene>
         <!-- Ambiente -->
-        <a-sky color="#000000"></a-sky>
+        <!-- <a-sky color="#000000"></a-sky> -->
 
         <!-- Camera rig with proximity sensor AND WASD controls -->
         <a-entity position="0 1.83 0" movement-controls="fly: true">
@@ -322,19 +408,19 @@
         </a-entity>
 
         <!-- Objetos -->
-        <a-box position="0 1 -7.25" rotation="0 0 0" color="#4CC3D9" scale="4 0.5 4"></a-box>
-        <a-cylinder id="target-sphere" position="0 1 -7.25" radius="1.25" color="#EF2D5E"></a-cylinder>
+        <a-box position="0 1 -7.25" rotation="0 0 0" color="#1f1f1f" scale="4 0.5 4"></a-box>
+        <a-cylinder id="target-sphere" position="0 1 -7.25" radius="1.25" color="#616161"></a-cylinder>
 
         <!-- Edificio -->
         <a-entity position="-32 -2.9 -58" scale="1 1 1" gltf-model="1.glb" shadow="cast: true; receive: false">
         </a-entity>
         <a-entity position="-32 -2.9 -58" scale="1 1 1" gltf-model="2.glb" shadow="cast: true; receive: false">
         </a-entity>
+        <a-entity position="0 1.5 -7" scale="0.055 0.055 0.055" gltf-model="iron.glb" shadow="cast: true; receive: false">
+        </a-entity>
         <a-entity position="0.2 1 -9.1" scale="1 1 1" gltf-model="man1.glb" shadow="cast: true; receive: false">
         </a-entity>
         <a-entity position="0.2 1 -9.1" scale="1 1 1" gltf-model="man2.glb" shadow="cast: true; receive: false">
-        </a-entity>
-        <a-entity position="0 1.5 -7" scale="0.055 0.055 0.055" gltf-model="iron.glb" shadow="cast: true; receive: false">
         </a-entity>
 
         <!-- Enhanced Screen Displays -->
@@ -456,16 +542,16 @@
         </a-entity>
 
         <!-- Iluminación -->
-        <a-light type="spot" color="#ffdb9d" intensity="1" position="0 4.4 0" angle="180" penumbra="0.1" distance="25"
+        <a-light type="spot" color="#ffdb9d" intensity="0.65" position="0 4.4 0" angle="180" penumbra="0.1" distance="25"
             decay="1" cast-shadow="true" shadow="mapSize: 1024; bias: -0.0001; camera-near: 0.01; camera-far: 0.2">
             <a-sphere radius="0.1" color="#ffdb9d" material="emissive: #fff6dd; emissiveIntensity: 1.5"></a-sphere>
         </a-light>
-        <a-light type="spot" color="#ffdb9d" intensity="1" rotation="0 180 0" position="0 4.4 0" angle="180"
+        <a-light type="spot" color="#ffdb9d" intensity="0.65" rotation="0 180 0" position="0 4.4 0" angle="180"
             penumbra="0.1" distance="25" decay="1" cast-shadow="true"
             shadow="mapSize: 1024; bias: -0.0001; camera-near: 0.01; camera-far: 0.2">
             <a-sphere radius="0.1" color="#ffdb9d" material="emissive: #fff6dd; emissiveIntensity: 1.5"></a-sphere>
         </a-light>
-        <a-light type="spot" color="#0080ff" intensity="0.5" rotation="0 90 0" position="0 1.7 -8" angle="180"
+        <a-light type="spot" color="#0080ff" intensity="2" rotation="0 90 0" position="0 1.7 -8" angle="180"
             penumbra="0.1" distance="25" decay="1" cast-shadow="true"
             shadow="mapSize: 1024; bias: -0.0001; camera-near: 0.01; camera-far: 0.2">
         </a-light>
